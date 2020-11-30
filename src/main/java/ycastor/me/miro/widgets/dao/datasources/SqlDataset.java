@@ -63,12 +63,7 @@ public class SqlDataset implements WidgetRepository {
     public ImmutableSortedSet<Widget> findFromZIndexUntilGap(Integer zIndex) {
         TreeSet<Widget> widgets = TreeSet.fromIterable(widgetSqlRepository.findAllByzIndexGreaterThanEqual(zIndex));
 
-        return widgets.takeWhile(widget -> {
-            var currentIndex = widgets.indexOf(it -> it.getId().equals(widget.getId())).orElse(0L).intValue();
-            var previousIndex = currentIndex == 0 ? currentIndex : currentIndex - 1;
-            var lastZIndex = widgets.get(previousIndex).map(Widget::getZIndex).orElse(-1);
-            return widget.getZIndex() <= (lastZIndex + 1);
-        });
+        return widgets.takeWhile(toGap(widgets));
     }
 
     @Override

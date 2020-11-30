@@ -1,6 +1,7 @@
 package ycastor.me.miro.widgets.dao;
 
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import org.springframework.data.domain.Pageable;
 
@@ -24,5 +25,14 @@ public interface WidgetRepository {
     Option<Widget> findById(UUID id);
 
     ImmutableSortedSet<Widget> listAllWithinArea(FilterArea filterArea);
+
+    default Predicate<Widget> toGap(ImmutableSortedSet<Widget> currentState) {
+        return widget -> {
+            var currentIndex = currentState.indexOf(it -> it.getId().equals(widget.getId())).orElse(0L).intValue();
+            var previousIndex = currentIndex == 0 ? currentIndex : currentIndex - 1;
+            var lastZIndex = currentState.get(previousIndex).map(Widget::getZIndex).orElse(-1);
+            return widget.getZIndex() <= (lastZIndex + 1);
+        };
+    }
 
 }

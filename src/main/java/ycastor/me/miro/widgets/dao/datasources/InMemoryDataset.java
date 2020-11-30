@@ -2,6 +2,7 @@ package ycastor.me.miro.widgets.dao.datasources;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Pageable;
@@ -53,7 +54,7 @@ public class InMemoryDataset implements WidgetRepository {
     public Widget save(Widget newWidget, ImmutableSortedSet<Widget> collidedWidgets) {
         var widgetWithId = generateId(newWidget);
         var currentState = widgetsState.get();
-        var withUpdatedCollisions = collidedWidgets.isEmpty() ? currentState : collidedWidgets.flatMap(it -> appendOrReplace(currentState, it));
+        var withUpdatedCollisions = fixingCollisions(currentState, collidedWidgets);
         var withUpdatedWidget = appendOrReplace(withUpdatedCollisions, widgetWithId);
 
         boolean success = widgetsState.compareAndSet(currentState, withUpdatedWidget);
@@ -93,12 +94,21 @@ public class InMemoryDataset implements WidgetRepository {
     public ImmutableSortedSet<Widget> findFromZIndexUntilGap(Integer zIndex) {
         var currentState = widgetsState.get();
         return currentState.dropUntil(widget -> zIndex.equals(widget.getZIndex()))
-                           .takeWhile(widget -> {
-                               var currentIndex = currentState.indexOf(it -> it.getId().equals(widget.getId())).orElse(0L).intValue();
-                               var previousIndex = currentIndex == 0 ? currentIndex : currentIndex - 1;
-                               var lastZIndex = currentState.get(previousIndex).map(Widget::getZIndex).orElse(-1);
-                               return widget.getZIndex() <= (lastZIndex + 1);
-                           });
+                           .takeWhile(toGap(currentState));
+    }
+
+    private ImmutableSortedSet<Widget> fixingCollisions(ImmutableSortedSet<Widget> current, ImmutableSortedSet<Widget> collisions) {
+        if(collisions.isEmpty()) {
+            return current;
+        }
+
+        var tmp = current;
+
+        for(Widget widget: collisions) {
+            tmp = appendOrReplace(tmp, widget);
+        }
+
+        return tmp;
     }
 
     private ImmutableSortedSet<Widget> appendOrReplace(ImmutableSortedSet<Widget> set, Widget widget) {
